@@ -18,6 +18,52 @@ Then open `http://<this-machine's-ip>:8000/` from any machine on the network.
 For local development with auto-reload: `uv run dev` (binds to 127.0.0.1:8000 by
 default; pass `--host`/`--port` to change).
 
+## Running with Docker
+
+Build and start the service in the background:
+
+```sh
+docker compose up --build -d
+```
+
+Open `http://<this-machine's-ip>:8000/`. To publish a different host port, set
+`PASTEBIN_PORT` when starting the service:
+
+```sh
+PASTEBIN_PORT=8080 docker compose up --build -d
+```
+
+The container runs as the unprivileged UID/GID `10001:10001`. Paste data is stored at
+`/data` in the container, backed by a Docker volume whose exact name is `pastefiles`.
+Compose creates the volume if it does not exist and reuses it on subsequent runs. An
+existing populated volume must be readable and writable by UID/GID `10001:10001`.
+
+Useful operating commands:
+
+```sh
+docker compose ps
+docker compose logs -f pastebin
+docker volume inspect pastefiles
+docker compose down
+```
+
+`docker compose down` preserves the volume. Do not add `--volumes` (or `-v`) unless
+you intend to delete every stored paste.
+
+To make a backup in the current directory, the application can remain running because
+pastes are published atomically and are never modified after creation:
+
+```sh
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  --volume pastefiles:/data:ro \
+  --volume "$PWD:/backup" \
+  alpine tar -czf /backup/pastefiles-backup.tar.gz -C /data .
+```
+
+The service has no authentication. Keep the published port on a trusted network, or
+put it behind an authenticated reverse proxy before exposing it more broadly.
+
 ## Storage
 
 Pastes live as plain files in one flat directory — no database, no metadata files.

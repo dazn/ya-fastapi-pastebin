@@ -1,0 +1,17 @@
+services:
+  pastebin:
+    build:
+      context: .
+    image: pastebin:local
+    init: true
+    ports:
+      - "${PASTEBIN_PORT:-8000}:8000"
+    environment:
+      PASTEBIN_STORAGE_DIR: /data
+    volumes:
+      - pastefiles:/data
+    restart: unless-stopped
+
+volumes:
+  pastefiles:
+    name: pastefiles
