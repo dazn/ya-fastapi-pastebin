@@ -8,6 +8,9 @@ dependencies = [
     "fastapi[standard]>=0.115",
 ]
 
+[project.scripts]
+dev = "pastebin.main:dev"
+
 [dependency-groups]
 dev = [
     "pytest>=8",

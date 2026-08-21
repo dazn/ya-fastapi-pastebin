@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastebin</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: system-ui, sans-serif;
+    line-height: 1.4;
+    max-width: 48rem;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+  form { display: grid; gap: .6rem; margin-bottom: 2rem; }
+  textarea {
+    width: 100%;
+    min-height: 7rem;
+    box-sizing: border-box;
+    padding: .5rem;
+    font: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    resize: vertical;
+  }
+  .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; padding: .4rem 1.2rem; cursor: pointer; }
+  button:disabled { cursor: default; opacity: .5; }
+  #status { color: #d33; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+  li { border: 1px solid #8884; border-radius: .4rem; overflow: hidden; }
+  li.empty { border: none; opacity: .6; }
+  li header {
+    font-size: .85rem;
+    opacity: .75;
+    padding: .3rem .7rem;
+    border-bottom: 1px solid #8884;
+    background: #8881;
+  }
+  li .body { padding: .6rem .7rem; }
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<h1>Pastebin</h1>
+
+<form id="paste-form">
+  <textarea id="text" name="text" placeholder="Paste text here…"></textarea>
+  <div class="row">
+    <input id="file" name="file" type="file">
+    <button id="submit" type="submit" disabled>Paste</button>
+    <span id="status" role="status"></span>
+  </div>
+</form>
+
+<ul id="pastes"></ul>
+
+<template id="paste-tpl">
+  <li><header><time></time></header><div class="body"></div></li>
+</template>
+
+<script>
+(() => {
+  const form = document.getElementById('paste-form');
+  const textarea = document.getElementById('text');
+  const fileInput = document.getElementById('file');
+  const submit = document.getElementById('submit');
+  const status = document.getElementById('status');
+  const list = document.getElementById('pastes');
+  const tpl = document.getElementById('paste-tpl');
+  let busy = false;
+
+  // Text and file are mutually exclusive; only one request in flight at a time.
+  function updateState() {
+    const hasText = textarea.value.trim() !== '';
+    const hasFile = fileInput.files.length === 1;
+    fileInput.disabled = busy || hasText;
+    textarea.disabled = busy || hasFile;
+    submit.disabled = busy || hasText === hasFile;
+  }
+
+  function render(pastes) {
+    list.replaceChildren();
+    if (pastes.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Nothing pasted yet.';
+      list.append(li);
+      return;
+    }
+    for (const p of pastes) {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      const time = node.querySelector('time');
+      time.dateTime = p.created_at;
+      time.textContent = new Date(p.created_at).toLocaleString();
+      const body = node.querySelector('.body');
+      if (p.type === 'text') {
+        const pre = document.createElement('pre');
+        pre.textContent = p.text;           // verbatim, never interpreted as HTML
+        body.append(pre);
+      } else {
+        const a = document.createElement('a');
+        a.href = p.url;
+        a.download = p.name;
+        a.textContent = p.name;
+        body.append(a);
+      }
+      list.append(node);
+    }
+  }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/pastes', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      render(await res.json());
+    } catch (err) {
+      status.textContent = `Could not load pastes: ${err.message}`;
+    }
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    const body = new FormData();
+    if (fileInput.files.length === 1) body.append('file', fileInput.files[0]);
+    else body.append('text', textarea.value);
+    busy = true;
+    status.textContent = '';
+    updateState();
+    try {
+      const res = await fetch('/api/pastes', { method: 'POST', body });
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch (_) { /* not JSON */ }
+        throw new Error(detail);
+      }
+      form.reset();
+    } catch (err) {
+      status.textContent = `Paste failed: ${err.message}`;
+    } finally {
+      busy = false;
+      updateState();
+      load();
+    }
+  });
+
+  textarea.addEventListener('input', updateState);
+  fileInput.addEventListener('change', updateState);
+  form.addEventListener('reset', () => setTimeout(updateState));
+  updateState();
+  load();
+})();
+</script>
+</body>
+</html>
