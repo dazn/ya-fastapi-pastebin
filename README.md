@@ -66,7 +66,7 @@ put it behind an authenticated reverse proxy before exposing it more broadly.
 
 ## Storage
 
-Pastes live as plain files in one flat directory — no database, no metadata files.
+Pastes live as plain files in one flat directory.
 
 - `PASTEBIN_STORAGE_DIR` selects the directory (default: `./storage`, relative to the
   current working directory; created on startup).
