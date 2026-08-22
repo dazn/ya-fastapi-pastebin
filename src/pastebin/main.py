@@ -9,7 +9,7 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -140,6 +140,13 @@ async def create_paste(
             raise HTTPException(413, "File too large") from exc
         return paste_to_json(paste)
     raise HTTPException(400, "Provide either text or a file")
+
+
+@app.delete("/api/pastes/{name}", status_code=204)
+def delete_paste(name: str, storage: StorageDep) -> Response:
+    if not storage.delete_paste(name):
+        raise HTTPException(404, "Not found")
+    return Response(status_code=204)
 
 
 @app.get("/files/{name}", include_in_schema=False)

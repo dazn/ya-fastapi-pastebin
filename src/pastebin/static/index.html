@@ -32,12 +32,28 @@
   li { border: 1px solid #8884; border-radius: .4rem; overflow: hidden; }
   li.empty { border: none; opacity: .6; }
   li header {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
     font-size: .85rem;
     opacity: .75;
     padding: .3rem .7rem;
     border-bottom: 1px solid #8884;
     background: #8881;
   }
+  .delete {
+    display: inline-grid;
+    place-items: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: .2rem;
+    border: 0;
+    border-radius: .25rem;
+    color: inherit;
+    background: transparent;
+  }
+  .delete:hover, .delete:focus-visible { color: #d33; background: #8882; }
+  .delete svg { width: 1.2rem; height: 1.2rem; }
   li .body { padding: .6rem .7rem; }
   pre {
     margin: 0;
@@ -62,7 +78,17 @@
 <ul id="pastes"></ul>
 
 <template id="paste-tpl">
-  <li><header><time></time></header><div class="body"></div></li>
+  <li>
+    <header>
+      <time></time>
+      <button class="delete" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-1 12H8L7 9Zm3 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z"/>
+        </svg>
+      </button>
+    </header>
+    <div class="body"></div>
+  </li>
 </template>
 
 <script>
@@ -85,13 +111,37 @@
     submit.disabled = busy || hasText === hasFile;
   }
 
+  function showEmptyState() {
+    list.replaceChildren();
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'Nothing pasted yet.';
+    list.append(li);
+  }
+
+  async function deletePaste(paste, node, button) {
+    button.disabled = true;
+    status.textContent = '';
+    try {
+      const name = encodeURIComponent(paste.name);
+      const res = await fetch(`/api/pastes/${name}`, { method: 'DELETE' });
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch (_) { /* not JSON */ }
+        throw new Error(detail);
+      }
+      node.remove();
+      if (list.children.length === 0) showEmptyState();
+    } catch (err) {
+      button.disabled = false;
+      status.textContent = `Delete failed for ${paste.name}: ${err.message}`;
+    }
+  }
+
   function render(pastes) {
     list.replaceChildren();
     if (pastes.length === 0) {
-      const li = document.createElement('li');
-      li.className = 'empty';
-      li.textContent = 'Nothing pasted yet.';
-      list.append(li);
+      showEmptyState();
       return;
     }
     for (const p of pastes) {
@@ -99,6 +149,11 @@
       const time = node.querySelector('time');
       time.dateTime = p.created_at;
       time.textContent = new Date(p.created_at).toLocaleString();
+      const deleteButton = node.querySelector('.delete');
+      const deleteLabel = `Delete ${p.name}`;
+      deleteButton.setAttribute('aria-label', deleteLabel);
+      deleteButton.title = deleteLabel;
+      deleteButton.addEventListener('click', () => deletePaste(p, node, deleteButton));
       const body = node.querySelector('.body');
       if (p.type === 'text') {
         const pre = document.createElement('pre');

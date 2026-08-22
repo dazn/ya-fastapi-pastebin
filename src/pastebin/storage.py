@@ -122,6 +122,7 @@ class Storage:
             component_limit = MAX_NAME_BYTES
         if component_limit <= 0:
             component_limit = MAX_NAME_BYTES
+        self.component_limit = component_limit
         self.max_name_bytes = min(MAX_NAME_BYTES, component_limit)
 
     def _create(self, name: str, write: Callable[[BinaryIO], None]) -> Path:
@@ -213,3 +214,27 @@ class Storage:
         except (FileNotFoundError, NotADirectoryError):
             return None
         return path if stat.S_ISREG(mode) else None
+
+    def delete_paste(self, name: str) -> bool:
+        """Permanently delete a visible regular file directly inside storage."""
+        if (
+            not name
+            or name.startswith(".")
+            or Path(name).name != name
+            or len(os.fsencode(name)) > self.component_limit
+        ):
+            return False
+
+        path = self.root / name
+        try:
+            mode = os.stat(path, follow_symlinks=False).st_mode
+        except (FileNotFoundError, NotADirectoryError, ValueError):
+            return False
+        if not stat.S_ISREG(mode):
+            return False
+
+        try:
+            path.unlink()
+        except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+            return False
+        return True
