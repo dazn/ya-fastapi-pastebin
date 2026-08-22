@@ -80,22 +80,25 @@ Pastes live as plain files in one flat directory.
   don't record a birth time).
 
 Anything you copy into the directory by hand shows up in the list as a download.
+Pastes can be permanently and immediately deleted from the web page or API.
 
 ## API
 
-| Method | Path             | Description                                             |
-|--------|------------------|---------------------------------------------------------|
-| GET    | `/`              | The web page                                            |
-| GET    | `/api/pastes`    | JSON list of pastes, newest first                       |
-| POST   | `/api/pastes`    | `multipart/form-data` with either `text` or `file`      |
-| GET    | `/files/{name}`  | Download an uploaded file                               |
-| GET    | `/health`        | `{"status": "ok"}`                                      |
+| Method | Path                   | Description                                             |
+|--------|------------------------|---------------------------------------------------------|
+| GET    | `/`                    | The web page                                            |
+| GET    | `/api/pastes`          | JSON list of pastes, newest first                       |
+| POST   | `/api/pastes`          | `multipart/form-data` with either `text` or `file`      |
+| DELETE | `/api/pastes/{name}`  | Permanently delete a paste (`204`, or `404` if absent) |
+| GET    | `/files/{name}`        | Download an uploaded file                               |
+| GET    | `/health`              | `{"status": "ok"}`                                      |
 
 ```sh
 curl -F 'text=hello from curl' http://HOST:8000/api/pastes
 curl -F 'file=@report.pdf'     http://HOST:8000/api/pastes
 curl http://HOST:8000/api/pastes
 curl -OJ http://HOST:8000/files/report.pdf
+curl -X DELETE http://HOST:8000/api/pastes/report.pdf
 ```
 
 ## Tests

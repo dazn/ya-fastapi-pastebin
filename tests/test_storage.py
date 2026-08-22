@@ -159,6 +159,55 @@ def test_symlinks_are_neither_listed_nor_served(tmp_path: Path) -> None:
     assert s.get_file("link.bin") is None
 
 
+def test_delete_text_paste(tmp_path: Path) -> None:
+    storage = Storage(tmp_path)
+    paste = storage.save_text("temporary")
+
+    assert storage.delete_paste(paste.name) is True
+    assert not paste.path.exists()
+    assert storage.list_pastes() == []
+    assert storage.delete_paste(paste.name) is False
+
+
+def test_delete_uploaded_and_manually_added_files(tmp_path: Path) -> None:
+    storage = Storage(tmp_path)
+    uploaded = storage.save_file("report.pdf", b"pdf")
+    manual = tmp_path / "manually added.data"
+    manual.write_bytes(b"data")
+
+    assert storage.delete_paste(uploaded.name) is True
+    assert storage.delete_paste(manual.name) is True
+    assert not uploaded.path.exists()
+    assert not manual.exists()
+
+
+@pytest.mark.parametrize("name", ["", "missing", "..", "../outside", "sub/file", "/tmp/file"])
+def test_delete_rejects_missing_and_invalid_names(tmp_path: Path, name: str) -> None:
+    storage = Storage(tmp_path)
+
+    assert storage.delete_paste(name) is False
+
+
+def test_delete_rejects_hidden_files_directories_and_symlinks(tmp_path: Path) -> None:
+    hidden = tmp_path / ".hidden"
+    hidden.write_text("hidden")
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    outside = tmp_path.parent / "delete-outside.bin"
+    outside.write_bytes(b"keep")
+    symlink = tmp_path / "link.bin"
+    symlink.symlink_to(outside)
+    storage = Storage(tmp_path)
+
+    assert storage.delete_paste(hidden.name) is False
+    assert storage.delete_paste(directory.name) is False
+    assert storage.delete_paste(symlink.name) is False
+    assert hidden.exists()
+    assert directory.is_dir()
+    assert symlink.is_symlink()
+    assert outside.read_bytes() == b"keep"
+
+
 def test_stream_limit_removes_private_partial_file(tmp_path: Path) -> None:
     s = Storage(tmp_path)
     with pytest.raises(FileTooLargeError):

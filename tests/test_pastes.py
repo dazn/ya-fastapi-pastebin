@@ -59,6 +59,53 @@ def test_post_file_and_download(client: TestClient, storage_dir: Path) -> None:
     assert d.headers["content-type"] == "application/octet-stream"
 
 
+def test_delete_text_paste(client: TestClient, storage_dir: Path) -> None:
+    item = client.post("/api/pastes", data={"text": "delete me"}).json()
+
+    response = client.delete(f"/api/pastes/{item['name']}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert not (storage_dir / item["name"]).exists()
+    assert client.get("/api/pastes").json() == []
+    assert client.delete(f"/api/pastes/{item['name']}").status_code == 404
+
+
+def test_delete_uploaded_file_removes_listing_and_download(
+    client: TestClient, storage_dir: Path
+) -> None:
+    item = client.post(
+        "/api/pastes", files={"file": ("réport 1.pdf", b"pdf", "application/pdf")}
+    ).json()
+
+    response = client.delete("/api/pastes/" + quote(item["name"]))
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert not (storage_dir / item["name"]).exists()
+    assert client.get("/api/pastes").json() == []
+    assert client.get(item["url"]).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/pastes/missing.bin",
+        "/api/pastes/.hidden",
+        "/api/pastes/..%2Foutside.bin",
+    ],
+)
+def test_delete_invalid_or_missing_paste_returns_404(
+    client: TestClient, storage_dir: Path, path: str
+) -> None:
+    (storage_dir / ".hidden").write_text("keep")
+
+    response = client.delete(path)
+
+    assert response.status_code == 404
+    assert (storage_dir / ".hidden").read_text() == "keep"
+
+
 def test_duplicate_upload_names_get_suffix(client: TestClient) -> None:
     names = [client.post("/api/pastes", files={"file": ("x.bin", b"1")}).json()["name"] for _ in range(2)]
     assert names == ["x.bin", "x-2.bin"]
@@ -145,3 +192,17 @@ def test_env_var_selects_storage_dir(tmp_path: Path, monkeypatch: pytest.MonkeyP
         assert c.get("/api/pastes").json() == []
         assert target.is_dir()
     del app.state.storage
+
+
+def test_index_includes_accessible_delete_behavior(client: TestClient) -> None:
+    html = client.get("/").text
+
+    assert "class=\"delete\"" in html
+    assert "setAttribute('aria-label', deleteLabel)" in html
+    assert "deleteButton.title = deleteLabel" in html
+    assert "encodeURIComponent(paste.name)" in html
+    assert "method: 'DELETE'" in html
+    assert "button.disabled = true" in html
+    assert "button.disabled = false" in html
+    assert "node.remove()" in html
+    assert "Delete failed for" in html
