@@ -10,6 +10,7 @@ Every paste is one plain file in the storage directory; there is no metadata.
 
 from __future__ import annotations
 
+import errno
 import os
 import re
 import stat
@@ -122,7 +123,6 @@ class Storage:
             component_limit = MAX_NAME_BYTES
         if component_limit <= 0:
             component_limit = MAX_NAME_BYTES
-        self.component_limit = component_limit
         self.max_name_bytes = min(MAX_NAME_BYTES, component_limit)
 
     def _create(self, name: str, write: Callable[[BinaryIO], None]) -> Path:
@@ -217,12 +217,7 @@ class Storage:
 
     def delete_paste(self, name: str) -> bool:
         """Permanently delete a visible regular file directly inside storage."""
-        if (
-            not name
-            or name.startswith(".")
-            or Path(name).name != name
-            or len(os.fsencode(name)) > self.component_limit
-        ):
+        if not name or name.startswith(".") or Path(name).name != name:
             return False
 
         path = self.root / name
@@ -230,6 +225,10 @@ class Storage:
             mode = os.stat(path, follow_symlinks=False).st_mode
         except (FileNotFoundError, NotADirectoryError, ValueError):
             return False
+        except OSError as exc:
+            if exc.errno == errno.ENAMETOOLONG:
+                return False
+            raise
         if not stat.S_ISREG(mode):
             return False
 

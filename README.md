@@ -50,15 +50,20 @@ docker compose down
 `docker compose down` preserves the volume. Do not add `--volumes` (or `-v`) unless
 you intend to delete every stored paste.
 
-To make a backup in the current directory, the application can remain running because
-pastes are published atomically and are never modified after creation:
+To make a backup in the current directory, stop the application first so that no
+pastes can be created or deleted while `tar` enumerates and reads the volume. Restart
+the application after the archive has been created:
 
 ```sh
+docker compose stop pastebin
+
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --volume pastefiles:/data:ro \
   --volume "$PWD:/backup" \
   alpine tar -czf /backup/pastefiles-backup.tar.gz -C /data .
+
+docker compose start pastebin
 ```
 
 The service has no authentication. Keep the published port on a trusted network, or

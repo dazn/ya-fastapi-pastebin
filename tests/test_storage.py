@@ -1,3 +1,4 @@
+import errno
 import os
 import time
 from io import BytesIO
@@ -179,6 +180,36 @@ def test_delete_uploaded_and_manually_added_files(tmp_path: Path) -> None:
     assert storage.delete_paste(manual.name) is True
     assert not uploaded.path.exists()
     assert not manual.exists()
+
+
+@pytest.mark.parametrize("name", ["a" * 201, "é" * 101])
+def test_delete_manual_name_above_pathconf_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    def unsupported_pathconf(path: os.PathLike[str], setting: str) -> int:
+        raise AttributeError
+
+    monkeypatch.setattr(os, "pathconf", unsupported_pathconf, raising=False)
+    storage = Storage(tmp_path)
+    manual = tmp_path / name
+    manual.write_bytes(b"data")
+
+    assert name in {paste.name for paste in storage.list_pastes()}
+    assert storage.delete_paste(name) is True
+    assert not manual.exists()
+
+
+def test_delete_treats_name_too_long_as_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    storage = Storage(tmp_path)
+
+    def name_too_long(path: os.PathLike[str], *, follow_symlinks: bool) -> os.stat_result:
+        raise OSError(errno.ENAMETOOLONG, "File name too long")
+
+    monkeypatch.setattr(os, "stat", name_too_long)
+
+    assert storage.delete_paste("too-long") is False
 
 
 @pytest.mark.parametrize("name", ["", "missing", "..", "../outside", "sub/file", "/tmp/file"])
