@@ -13,14 +13,21 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 COPY --from=uv /uv /uvx /bin/
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 COPY src ./src
 
+# Keep the package readme optional in the Docker build context.
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,target=/build-context \
+    if [ -f /build-context/README.md ]; then \
+        cp /build-context/README.md README.md; \
+    else \
+        touch README.md; \
+    fi && \
     uv sync --frozen --no-dev --no-editable
 
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
