@@ -6,6 +6,11 @@ Open `/` in a browser to get a paste form (plain text **or** one file) followed 
 previous paste, newest first. Text is shown verbatim; files are download links. The whole
 page is a single HTML file with inline CSS and vanilla JavaScript.
 
+Drop one file anywhere inside the paste form (including the text box), or use
+**Choose File**, then click **Paste** to upload it. Clear any entered text before
+selecting a file. Dropping another file replaces the selection; folders and multiple
+files are rejected. Files are limited to 100 MiB.
+
 ## Running on the LAN
 
 ```sh
